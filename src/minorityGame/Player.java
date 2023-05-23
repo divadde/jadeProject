@@ -18,16 +18,21 @@ public class Player extends Agent {
 
     private int stepSim=0;
 
-    private Observer observer;
+    private Observer observer; //debug
+
 
     protected void setup(){
         Object[] args = getArguments();
         myId = (Integer) args[0];
-        observer = (Observer)  args[1];
+        observer = (Observer) args[1];
         memory = memoryInitialization();
         strategyPool = strategyPoolInitialization();
         virtualScore = new int[Parameters.S];
         System.out.println("Player "+myId+" pronto.");
+        ACLMessage ready = new ACLMessage(ACLMessage.INFORM);
+        ready.addReceiver(new AID("manager",AID.ISLOCALNAME));
+        ready.setConversationId("ready");
+        send(ready);
         addBehaviour(new PlayerBehaviour());
 
         /*
@@ -52,15 +57,16 @@ public class Player extends Agent {
         private int myDecision;
         private int myStrategy;
 
-        private MessageTemplate reqTempl, outcomeTempl;
+        private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
 
         @Override
         public void action() {
             switch(step){
                 case 0: //Receiving request
                     //System.out.println("Player "+myId+" pronto a ricevere la richiesta"); //debug
-                    reqTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
-                            MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
                     ACLMessage req = myAgent.receive(reqTempl);
                     if (req!=null) {
                         //System.out.println("Player "+myId+" ha ricevuto la richiesta"); //debug
@@ -85,8 +91,6 @@ public class Player extends Agent {
                     step=2;
                     break;
                 case 2: //Receiving outcome
-                    outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
-                            MessageTemplate.MatchPerformative(ACLMessage.INFORM));
                     ACLMessage outcome = myAgent.receive(outcomeTempl);
                     //System.out.println("Provo a ricevere outcome, player "+myId);
                     if (outcome!=null) {

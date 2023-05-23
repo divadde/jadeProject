@@ -23,7 +23,7 @@ public class Master extends Agent {
         } catch (Exception e) {
             System.out.println("Errore durante la creazione di manager e giocatori.");
         }
-        //System.out.println("Creazione del manager e dei giocatori andata a buon fine, bye by Master.");
+        System.out.println("Creazione del manager e dei giocatori andata a buon fine, bye by Master.");
         doDelete();
     }
 

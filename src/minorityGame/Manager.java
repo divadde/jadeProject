@@ -22,8 +22,8 @@ public class Manager extends Agent {
     protected void setup(){
         System.out.println("Manager pronto.");
         Object[] args = getArguments();
-        observer = (Observer) args[0];
-        addBehaviour(new CommunicationBehaviour());
+        observer = (Observer) args[0]; //debug
+        addBehaviour(new WaitPlayers());
         /*
         addBehaviour(new Behaviour() {
             @Override
@@ -41,12 +41,32 @@ public class Manager extends Agent {
         //doDelete
     }
 
+    private class WaitPlayers extends Behaviour {
+        int replies=0;
+        MessageTemplate ready = MessageTemplate.and(MessageTemplate.MatchConversationId("ready"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+        @Override
+        public void action() {
+            ACLMessage reply = myAgent.receive(ready);
+            if (reply!=null) {
+                replies++;
+            }
+            else { block(); }
+            if (replies==Parameters.N) addBehaviour(new CommunicationBehaviour());
+        }
+
+        @Override
+        public boolean done() {
+            return replies==Parameters.N;
+        }
+    }
     private class CommunicationBehaviour extends CyclicBehaviour {
         private int step=0;
         private int replies=0;
         private int numA=0; //se arriva 1 (A)
         private int numB=0; //se arriva 0 (B)
-        private MessageTemplate decision;
+        private MessageTemplate decision = MessageTemplate.and(MessageTemplate.MatchConversationId("decision"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
 
         @Override
         public void action() {
@@ -54,16 +74,9 @@ public class Manager extends Agent {
                 case 0: //Ask to players
                     //System.out.println("Manager asks to player"); //debug
                     ACLMessage req = new ACLMessage(ACLMessage.REQUEST);
-                    for (int i=0; i < Parameters.N; i++) {
-                        //System.out.println(i);
-                        System.out.println("Aggiungo ricevitore: player"+i);
-                        AID player = new AID(("player"+i),AID.ISLOCALNAME);
-                        req.addReceiver(player);
-                    }
                     req.setConversationId("asking-players"); //Id della conversazione
+                    for (int i=0; i < Parameters.N; i++) { req.addReceiver(new AID("player"+i,AID.ISLOCALNAME)); }
                     myAgent.send(req);
-                    decision = MessageTemplate.and(MessageTemplate.MatchConversationId("decision"),
-                                                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
                     step=1;
                     break;
                 case 1: //Read decision of players
@@ -97,10 +110,10 @@ public class Manager extends Agent {
                     outcome.setContent(Integer.toString(winner));
                     outcome.setConversationId("outcome-to-players"); //Id della conversazione
                     myAgent.send(outcome);
-                    //System.out.println("End of the step");
                     stepSim++;
                     numA=0;
                     numB=0;
+                    replies=0;
                     //if (stepSim<=Parameters.T) myAgent.addBehaviour(new CommunicationBehaviour()); //provo così
                     System.out.println("Numero simulazione: "+stepSim);
                     if (stepSim>=Parameters.T) {
@@ -110,7 +123,6 @@ public class Manager extends Agent {
                         observer.getSideA();
                         doDelete();
                     }
-                    replies=0;
                     step=0;
                     break;
             }
