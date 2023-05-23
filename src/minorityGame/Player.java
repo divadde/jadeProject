@@ -5,6 +5,7 @@ import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
 
 public class Player extends Agent {
     //idea: un behavior (calcolo decisione e aggiornamento score) in un cyclic
@@ -15,40 +16,60 @@ public class Player extends Agent {
     private int realScore=0;
     private int myId;
 
-    //todo: settare AID per il player?
+    private int stepSim=0;
+
+    private Observer observer;
+
     protected void setup(){
         Object[] args = getArguments();
         myId = (Integer) args[0];
+        observer = (Observer)  args[1];
         memory = memoryInitialization();
         strategyPool = strategyPoolInitialization();
         virtualScore = new int[Parameters.S];
         System.out.println("Player "+myId+" pronto.");
-        addBehaviour(new CyclicBehaviour() {
+        addBehaviour(new PlayerBehaviour());
+
+        /*
+        addBehaviour(new Behaviour() {
             @Override
             public void action() {
                 myAgent.addBehaviour(new PlayerBehaviour());
+                stepSim++;
+            }
+            @Override
+            public boolean done() {
+                return stepSim==Parameters.T;
             }
         });
         //doDelete();
+         */
     }
 
 
-    private class PlayerBehaviour extends Behaviour{
+    private class PlayerBehaviour extends CyclicBehaviour{
         private int step=0;
         private int myDecision;
         private int myStrategy;
+
+        private MessageTemplate reqTempl, outcomeTempl;
 
         @Override
         public void action() {
             switch(step){
                 case 0: //Receiving request
-                    ACLMessage req = myAgent.receive();
+                    //System.out.println("Player "+myId+" pronto a ricevere la richiesta"); //debug
+                    reqTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
+                            MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+                    ACLMessage req = myAgent.receive(reqTempl);
                     if (req!=null) {
-                        if (req.getPerformative()==ACLMessage.REQUEST && req.getConversationId()=="asking-players") { //todo (capire meglio cosa succede se il performative non è corretto)
-                            step=1;
-                        }
+                        //System.out.println("Player "+myId+" ha ricevuto la richiesta"); //debug
+                        step=1;
                     }
-                    else { block(); }
+                    else {
+                        //System.out.println("Ora mi blocco, player "+myId);
+                        block(); }
+                    //System.out.println("Player "+myId+", step "+step);
                     break;
                 case 1: //Send decision
                     ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
@@ -56,28 +77,39 @@ public class Player extends Agent {
                     decision.setConversationId("decision"); //Id della conversazione
                     myStrategy = selectBestStrategy();
                     myDecision = takeDecision(myStrategy);
+                    if (stepSim==0) observer.myFirstChoice(myId,myDecision);
+                    else observer.myChoice(myId,myDecision);
                     decision.setContent(Integer.toString(myDecision));
-                    decision.setReplyWith("decision"+System.currentTimeMillis()); //todo: è giusto? probabilmente no (manager si aspetta "req"+currentMillis
                     myAgent.send(decision);
+                    //System.out.println("Player "+myId+" ha inviato la decisione: "+myDecision); //debug
                     step=2;
                     break;
                 case 2: //Receiving outcome
-                    ACLMessage outcome = myAgent.receive();
+                    outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
+                            MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+                    ACLMessage outcome = myAgent.receive(outcomeTempl);
+                    //System.out.println("Provo a ricevere outcome, player "+myId);
                     if (outcome!=null) {
-                        if (outcome.getPerformative()==ACLMessage.INFORM && outcome.getConversationId()=="outcome-to-players") {
-                            update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
-                            step=3;
+                        update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                        //System.out.println("Player "+myId+"ha ricevuto l'outcome"); //debug
+                        step=0;
+                        stepSim++;
+                        //if (stepSim<Parameters.T) myAgent.addBehaviour(new PlayerBehaviour()); //provo così
+                        if (stepSim>=Parameters.T) {
+                            System.out.println("Player "+myId+" score: "+realScore);
+                            doDelete();
                         }
+                        //System.out.println("Player "+myId+" score: "+realScore); //debug
                     }
                     else { block(); }
                     break;
             }
         }
 
-        @Override
-        public boolean done() {
-            return step==3;
-        }
+        //@Override
+        //public boolean done() {
+        //    return step==3;
+        //}
     }
 
     private int[] memoryInitialization() {

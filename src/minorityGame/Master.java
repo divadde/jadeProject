@@ -9,20 +9,21 @@ public class Master extends Agent {
 
     protected void setup(){
         System.out.println("Creazione del manager e dei giocatori.");
-        ContainerController cc = null;
-        AgentController ac = null;
+        ContainerController cc;
+        AgentController ac;
+        Observer observer = new Observer();
         try {
             cc = getContainerController();
-            ac = cc.createNewAgent("manager","minorityGame.Manager",null);
+            ac = cc.createNewAgent("manager","minorityGame.Manager",new Object[]{observer});
             ac.start();
             for (int i=0; i<Parameters.N; i++){
-                ac = cc.createNewAgent("player"+i,"minorityGame.Player",new Object[]{i});
+                ac = cc.createNewAgent("player"+i,"minorityGame.Player",new Object[]{i,observer});
                 ac.start();
             }
         } catch (Exception e) {
             System.out.println("Errore durante la creazione di manager e giocatori.");
         }
-        System.out.println("Creazione del manager e dei giocatori andata a buon fine, bye by Master.");
+        //System.out.println("Creazione del manager e dei giocatori andata a buon fine, bye by Master.");
         doDelete();
     }
 
