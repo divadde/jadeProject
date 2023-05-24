@@ -7,6 +7,8 @@ import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 
+import java.util.Arrays;
+
 public class Player extends Agent {
     //idea: un behavior (calcolo decisione e aggiornamento score) in un cyclic
 
@@ -15,7 +17,6 @@ public class Player extends Agent {
     private int[] virtualScore;
     private int realScore=0;
     private int myId;
-
     private int stepSim=0;
 
     private Observer observer; //debug
@@ -28,27 +29,16 @@ public class Player extends Agent {
         memory = memoryInitialization();
         strategyPool = strategyPoolInitialization();
         virtualScore = new int[Parameters.S];
-        System.out.println("Player "+myId+" pronto.");
+        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[0]));
+        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[1]));
+        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[2]));
+        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[3]));
+        //System.out.println("Player "+myId+" pronto.");
         ACLMessage ready = new ACLMessage(ACLMessage.INFORM);
         ready.addReceiver(new AID("manager",AID.ISLOCALNAME));
         ready.setConversationId("ready");
         send(ready);
         addBehaviour(new PlayerBehaviour());
-
-        /*
-        addBehaviour(new Behaviour() {
-            @Override
-            public void action() {
-                myAgent.addBehaviour(new PlayerBehaviour());
-                stepSim++;
-            }
-            @Override
-            public boolean done() {
-                return stepSim==Parameters.T;
-            }
-        });
-        //doDelete();
-         */
     }
 
 
@@ -83,9 +73,10 @@ public class Player extends Agent {
                     decision.setConversationId("decision"); //Id della conversazione
                     myStrategy = selectBestStrategy();
                     myDecision = takeDecision(myStrategy);
+                    //System.out.println("player "+myId+" take decision: "+ myDecision +", at step "+stepSim);
                     if (stepSim==0) observer.myFirstChoice(myId,myDecision);
                     else observer.myChoice(myId,myDecision);
-                    decision.setContent(Integer.toString(myDecision));
+                    decision.setContent(String.valueOf(myDecision));
                     myAgent.send(decision);
                     //System.out.println("Player "+myId+" ha inviato la decisione: "+myDecision); //debug
                     step=2;
@@ -95,12 +86,14 @@ public class Player extends Agent {
                     //System.out.println("Provo a ricevere outcome, player "+myId);
                     if (outcome!=null) {
                         update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                        //System.out.println("player "+myId+" memory after update: "+ Arrays.toString(memory) +", step "+stepSim);
+                        //System.out.println("player "+myId+" strategies after update: "+ Arrays.toString(virtualScore) +", step "+stepSim);
                         //System.out.println("Player "+myId+"ha ricevuto l'outcome"); //debug
                         step=0;
                         stepSim++;
                         //if (stepSim<Parameters.T) myAgent.addBehaviour(new PlayerBehaviour()); //provo così
                         if (stepSim>=Parameters.T) {
-                            System.out.println("Player "+myId+" score: "+realScore);
+                            //System.out.println("Player "+myId+" score: "+realScore);
                             doDelete();
                         }
                         //System.out.println("Player "+myId+" score: "+realScore); //debug
@@ -109,11 +102,6 @@ public class Player extends Agent {
                     break;
             }
         }
-
-        //@Override
-        //public boolean done() {
-        //    return step==3;
-        //}
     }
 
     private int[] memoryInitialization() {
@@ -134,7 +122,6 @@ public class Player extends Agent {
         return s;
     }
 
-    //todo verifica correttezza
     private int takeDecision(int strategyChosen){
         int v=0, p;
         for( int i=Parameters.M-1; i>=0; --i ){ //for all bits of m, from M-1 (least significant bit) to 0 (most significant bit)
@@ -146,7 +133,7 @@ public class Player extends Agent {
 
     private int selectBestStrategy(){
         int s = 0;
-        int currMax = virtualScore[0];
+        int currMax = virtualScore[s];
         for (int i=0; i<virtualScore.length; i++){
             if (currMax<virtualScore[i]) {
                 s=i;
@@ -158,7 +145,9 @@ public class Player extends Agent {
 
     //0 == B, 1 == A
     private void update(int decision, int outcome, int strategyChosen){
-        rightShiftOnMemory();
+        for (int i=Parameters.M-1; i>0; i--) { //right-shift
+            memory[i] = memory[i-1];
+        }
         memory[0] = outcome;
         if (decision==outcome){
             realScore++;
@@ -166,14 +155,6 @@ public class Player extends Agent {
         }
         else {
             virtualScore[strategyChosen]--;
-        }
-    }
-
-    //todo: da testare
-    private void rightShiftOnMemory(){
-        for (int i=Parameters.M-2; i>=0; i--) {
-            int current = memory[i];
-            memory[i+1] = current;
         }
     }
 

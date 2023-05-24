@@ -8,13 +8,6 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 
 public class Manager extends Agent {
-    //idea: un behavior a step sequenziali (chiedo, aspetto scelta, comunico outcome) in un behaviour a 1000 steps (più messaggio finale ai giocatori?)
-    //behaviour classes come inner classes
-    //un solo thread che gestisce tutti i behaviour
-    //metodo action() di un behavior deve essere atomico, (no cicli while true) ogni azione deve avere un block()
-    //diverse tipologie di behavior (one-shot, cyclic, generic, waker, ticker)
-    //sfruttare il metodo receive (ACLMessage)
-    //usare un array di giocatori (AID)? No, prova a riferirti col nome
 
     private int stepSim=0;
     private Observer observer;
@@ -24,21 +17,6 @@ public class Manager extends Agent {
         Object[] args = getArguments();
         observer = (Observer) args[0]; //debug
         addBehaviour(new WaitPlayers());
-        /*
-        addBehaviour(new Behaviour() {
-            @Override
-            public void action() {
-                //System.out.println("Step numero: "+stepSim);
-                myAgent.addBehaviour(new CommunicationBehaviour());
-                stepSim++;
-            }
-            @Override
-            public boolean done() {
-                return stepSim==Parameters.T;
-            }
-        });
-         */
-        //doDelete
     }
 
     private class WaitPlayers extends Behaviour {
@@ -60,6 +38,7 @@ public class Manager extends Agent {
             return replies==Parameters.N;
         }
     }
+
     private class CommunicationBehaviour extends CyclicBehaviour {
         private int step=0;
         private int replies=0;
@@ -107,7 +86,7 @@ public class Manager extends Agent {
                     }
                     ACLMessage outcome = new ACLMessage(ACLMessage.INFORM);
                     for (int i=0; i < Parameters.N; i++) { outcome.addReceiver(new AID("player"+i,AID.ISLOCALNAME)); }
-                    outcome.setContent(Integer.toString(winner));
+                    outcome.setContent(String.valueOf(winner));
                     outcome.setConversationId("outcome-to-players"); //Id della conversazione
                     myAgent.send(outcome);
                     stepSim++;
@@ -127,13 +106,6 @@ public class Manager extends Agent {
                     break;
             }
         }
-
-        /*
-        @Override
-        public boolean done() {
-            return step==3;
-        }
-        */
 
     }
 

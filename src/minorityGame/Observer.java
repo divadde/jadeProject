@@ -20,9 +20,9 @@ public class Observer {
         sideA.addLast(numerosity);
     }
     public void getSideA(){
-        System.out.print("<");
-        for (Integer i: sideA) System.out.print(i+",");
-        System.out.print(">");
+        System.out.println("<");
+        for (Integer i: sideA) System.out.println(i);
+        System.out.println(">");
     }
     public void calculateFsPerStep(int winningPlayers){
         fs = fs + ((double) winningPlayers)/((double) Parameters.N);
