@@ -6,20 +6,18 @@ import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
+import minorityNick.Utility;
 
 import java.util.Arrays;
 
 public class Player extends Agent {
-    //idea: un behavior (calcolo decisione e aggiornamento score) in un cyclic
-
     private int[] memory;
     private int[][] strategyPool;
-    private int[] virtualScore;
+    private int[] virtualScore = new int[Parameters.S];;
     private int realScore=0;
     private int myId;
     private int stepSim=0;
-
-    private Observer observer; //debug
+    private Observer observer;
 
 
     protected void setup(){
@@ -28,12 +26,6 @@ public class Player extends Agent {
         observer = (Observer) args[1];
         memory = memoryInitialization();
         strategyPool = strategyPoolInitialization();
-        virtualScore = new int[Parameters.S];
-        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[0]));
-        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[1]));
-        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[2]));
-        //System.out.println("player "+myId+" strategies: "+ Arrays.toString(strategyPool[3]));
-        //System.out.println("Player "+myId+" pronto.");
         ACLMessage ready = new ACLMessage(ACLMessage.INFORM);
         ready.addReceiver(new AID("manager",AID.ISLOCALNAME));
         ready.setConversationId("ready");
@@ -43,10 +35,9 @@ public class Player extends Agent {
 
 
     private class PlayerBehaviour extends CyclicBehaviour{
-        private int step=0;
         private int myDecision;
         private int myStrategy;
-
+        private int lastStrategy;
         private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
                 MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
         private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
@@ -54,60 +45,45 @@ public class Player extends Agent {
 
         @Override
         public void action() {
-            switch(step){
-                case 0: //Receiving request
-                    //System.out.println("Player "+myId+" pronto a ricevere la richiesta"); //debug
-                    ACLMessage req = myAgent.receive(reqTempl);
-                    if (req!=null) {
-                        //System.out.println("Player "+myId+" ha ricevuto la richiesta"); //debug
-                        step=1;
+            ACLMessage req = myAgent.receive(reqTempl);
+            if (req!=null) {
+                ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
+                decision.addReceiver(new AID("manager",AID.ISLOCALNAME));
+                decision.setConversationId("decision"); //Id della conversazione
+                myStrategy = selectBestStrategy();
+                myDecision = takeDecision(myStrategy);
+                observer.playerChoice(lastStrategy, myStrategy);
+                //System.out.println("player "+myId+" take decision: "+ choice +", at step "+stepSim);
+                lastStrategy = myStrategy;
+                decision.setContent(String.valueOf(myDecision));
+                myAgent.send(decision);
+                ACLMessage outcome = myAgent.receive(outcomeTempl);
+                //System.out.println("Provo a ricevere outcome, player "+myId);
+                if (outcome!=null) {
+                    update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                    stepSim++;
+                    if (stepSim>=Parameters.T) {
+                        doDelete();
                     }
-                    else {
-                        //System.out.println("Ora mi blocco, player "+myId);
-                        block(); }
-                    //System.out.println("Player "+myId+", step "+step);
-                    break;
-                case 1: //Send decision
-                    ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
-                    decision.addReceiver(new AID("manager",AID.ISLOCALNAME));
-                    decision.setConversationId("decision"); //Id della conversazione
-                    myStrategy = selectBestStrategy();
-                    myDecision = takeDecision(myStrategy);
-                    //System.out.println("player "+myId+" take decision: "+ myDecision +", at step "+stepSim);
-                    if (stepSim==0) observer.myFirstChoice(myId,myDecision);
-                    else observer.myChoice(myId,myDecision);
-                    decision.setContent(String.valueOf(myDecision));
-                    myAgent.send(decision);
-                    //System.out.println("Player "+myId+" ha inviato la decisione: "+myDecision); //debug
-                    step=2;
-                    break;
-                case 2: //Receiving outcome
-                    ACLMessage outcome = myAgent.receive(outcomeTempl);
-                    //System.out.println("Provo a ricevere outcome, player "+myId);
-                    if (outcome!=null) {
-                        update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
-                        //System.out.println("player "+myId+" memory after update: "+ Arrays.toString(memory) +", step "+stepSim);
-                        //System.out.println("player "+myId+" strategies after update: "+ Arrays.toString(virtualScore) +", step "+stepSim);
-                        //System.out.println("Player "+myId+"ha ricevuto l'outcome"); //debug
-                        step=0;
-                        stepSim++;
-                        //if (stepSim<Parameters.T) myAgent.addBehaviour(new PlayerBehaviour()); //provo così
-                        if (stepSim>=Parameters.T) {
-                            //System.out.println("Player "+myId+" score: "+realScore);
-                            doDelete();
-                        }
-                        //System.out.println("Player "+myId+" score: "+realScore); //debug
-                    }
-                    else { block(); }
-                    break;
+                    //System.out.println("player "+myId+" memory after update: "+ Arrays.toString(memory) +", step "+stepSim);
+                    //System.out.println("player "+myId+" strategies after update: "+ Arrays.toString(virtualScore) +", step "+stepSim);
+                    //System.out.println("player "+myId+" score: "+ realScore +", step "+stepSim);
+                    //System.out.println("Player "+myId+"ha ricevuto l'outcome "+updateValue); //debug
+                    //System.out.println("Player "+myId+" score: "+realScore); //debug
+                }
+                else { block(); }
             }
+            else { block(); }
         }
+
+
     }
+
 
     private int[] memoryInitialization() {
         int[] m=new int[Parameters.M];
         for (int i = 0; i < Parameters.M; ++i) {
-            m[i] = Math.random() < 0.5 ? 1 : 0;
+            m[i] = (Math.random() < 0.5) ? 1 : 0;
         }
         return m;
     }
@@ -116,7 +92,7 @@ public class Player extends Agent {
         int[][] s=new int[Parameters.S][(int)Math.pow(2,Parameters.M)];
         for( int i=0; i<Parameters.S; ++i ) {
             for (int j=0; j<s[i].length; ++j) {
-                s[i][j] = Math.random() < 0.5 ? 1 : 0;
+                s[i][j] = (Math.random() < 0.5)? 1 : 0;
             }
         }
         return s;

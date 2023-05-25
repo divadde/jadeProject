@@ -6,6 +6,7 @@ import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
+import minorityNick.Utility;
 
 public class Manager extends Agent {
 
@@ -50,7 +51,8 @@ public class Manager extends Agent {
         @Override
         public void action() {
             switch(step){
-                case 0: //Ask to players
+                case 0: //Ask to player
+                    numA=0; numB=0; replies=0;
                     //System.out.println("Manager asks to player"); //debug
                     ACLMessage req = new ACLMessage(ACLMessage.REQUEST);
                     req.setConversationId("asking-players"); //Id della conversazione
@@ -59,13 +61,12 @@ public class Manager extends Agent {
                     step=1;
                     break;
                 case 1: //Read decision of players
-                    //System.out.println("Manager read decisions"); //debug
                     ACLMessage reply = myAgent.receive(decision);
                     if (reply!=null) {
                         //System.out.println("Manager read decisions"); //debug
-                        int choice = Integer.parseInt(reply.getContent());; //1==A, 0==B
-                        if (choice==0) numB++;
-                        else numA++;
+                        int choice = Integer.parseInt(reply.getContent());; //0==A, 1==B
+                        if (choice==1) numA++;
+                        else numB++;
                         replies++;
                         //System.out.println("Numero replies "+replies+ " allo step "+stepSim);
                         if (replies==Parameters.N) step=2;
@@ -73,9 +74,10 @@ public class Manager extends Agent {
                     else { block(); }
                     break;
                 case 2: //Send players outcome (winner choice)
-                    //System.out.println("Manager communicate outcome"); //debug
                     observer.updateSideA(numA);
                     observer.calculateCommutationPerStep();
+                    ACLMessage outcome = new ACLMessage(ACLMessage.INFORM);
+                    for (int i=0; i < Parameters.N; i++) { outcome.addReceiver(new AID("player"+i,AID.ISLOCALNAME)); }
                     int winner=1;
                     if (numB<numA) {
                         winner=0;
@@ -84,16 +86,10 @@ public class Manager extends Agent {
                     else {
                         observer.calculateFsPerStep(numA);
                     }
-                    ACLMessage outcome = new ACLMessage(ACLMessage.INFORM);
-                    for (int i=0; i < Parameters.N; i++) { outcome.addReceiver(new AID("player"+i,AID.ISLOCALNAME)); }
                     outcome.setContent(String.valueOf(winner));
                     outcome.setConversationId("outcome-to-players"); //Id della conversazione
                     myAgent.send(outcome);
                     stepSim++;
-                    numA=0;
-                    numB=0;
-                    replies=0;
-                    //if (stepSim<=Parameters.T) myAgent.addBehaviour(new CommunicationBehaviour()); //provo così
                     System.out.println("Numero simulazione: "+stepSim);
                     if (stepSim>=Parameters.T) {
                         System.out.println("End simulation: "+stepSim);
