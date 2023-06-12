@@ -1,4 +1,4 @@
-package minorityGame;
+package minorityGamePt2;
 
 import jade.core.Agent;
 import jade.wrapper.AgentController;
@@ -15,10 +15,10 @@ public class Master extends Agent {
         Observer observer = new Observer();
         try {
             cc = getContainerController();
-            ac = cc.createNewAgent("manager","provaMinority.Manager",new Object[]{observer});
+            ac = cc.createNewAgent("manager","minorityGamePt2.Manager",new Object[]{observer});
             ac.start();
             for (int i = 0; i< Parameters.N; i++){
-                ac = cc.createNewAgent("player"+i,"provaMinority.Player",new Object[]{i,observer});
+                ac = cc.createNewAgent("player"+i,"minorityGamePt2.Player",new Object[]{i,observer});
                 ac.start();
             }
         } catch (Exception e) {

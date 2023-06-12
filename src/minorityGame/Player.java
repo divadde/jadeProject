@@ -3,21 +3,22 @@ package minorityGame;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
-import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
-import minorityNick.Utility;
 
-import java.util.Arrays;
 
 public class Player extends Agent {
     private int[] memory;
     private int[][] strategyPool;
-    private int[] virtualScore = new int[Parameters.S];;
+    private int[] virtualScore = new int[minorityGame.Parameters.S];;
     private int realScore=0;
     private int myId;
     private int stepSim=0;
     private Observer observer;
+
+    private int myDecision;
+    private int myStrategy;
+    private int lastStrategy;
 
 
     protected void setup(){
@@ -30,25 +31,20 @@ public class Player extends Agent {
         ready.addReceiver(new AID("manager",AID.ISLOCALNAME));
         ready.setConversationId("ready");
         send(ready);
-        addBehaviour(new PlayerBehaviour());
+        addBehaviour(new TakeDecision());
     }
 
-
-    private class PlayerBehaviour extends CyclicBehaviour{
-        private int myDecision;
-        private int myStrategy;
-        private int lastStrategy;
+    private class TakeDecision extends Behaviour{
         private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
                 MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
-        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
-                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+        private boolean doneAction=false;
 
         @Override
         public void action() {
             ACLMessage req = myAgent.receive(reqTempl);
             if (req!=null) {
                 ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
-                decision.addReceiver(new AID("manager",AID.ISLOCALNAME));
+                decision.addReceiver(new AID("manager", AID.ISLOCALNAME));
                 decision.setConversationId("decision"); //Id della conversazione
                 myStrategy = selectBestStrategy();
                 myDecision = takeDecision(myStrategy);
@@ -57,26 +53,51 @@ public class Player extends Agent {
                 lastStrategy = myStrategy;
                 decision.setContent(String.valueOf(myDecision));
                 myAgent.send(decision);
-                ACLMessage outcome = myAgent.receive(outcomeTempl);
-                //System.out.println("Provo a ricevere outcome, player "+myId);
-                if (outcome!=null) {
-                    update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
-                    stepSim++;
-                    if (stepSim>=Parameters.T) {
-                        doDelete();
-                    }
-                    //System.out.println("player "+myId+" memory after update: "+ Arrays.toString(memory) +", step "+stepSim);
-                    //System.out.println("player "+myId+" strategies after update: "+ Arrays.toString(virtualScore) +", step "+stepSim);
-                    //System.out.println("player "+myId+" score: "+ realScore +", step "+stepSim);
-                    //System.out.println("Player "+myId+"ha ricevuto l'outcome "+updateValue); //debug
-                    //System.out.println("Player "+myId+" score: "+realScore); //debug
-                }
-                else { block(); }
+                doneAction=true;
+            }
+            else {
+                block();
+            }
+        }
+
+        @Override
+        public boolean done() {
+            if (doneAction) {
+                myAgent.addBehaviour(new ReadResults());
+            }
+            return doneAction;
+        }
+
+    }
+
+    private class ReadResults extends Behaviour{
+
+        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+        private boolean doneAction=false;
+
+        @Override
+        public void action() {
+            ACLMessage outcome = myAgent.receive(outcomeTempl);
+            if (outcome!=null) {
+                update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                stepSim++;
+                doneAction=true;
             }
             else { block(); }
         }
 
 
+        @Override
+        public boolean done() {
+            if (doneAction) {
+                myAgent.addBehaviour(new TakeDecision());
+            }
+            if (stepSim>=Parameters.T && doneAction) {
+                myAgent.doDelete();
+            }
+            return doneAction;
+        }
     }
 
 
@@ -89,8 +110,8 @@ public class Player extends Agent {
     }
 
     private int[][] strategyPoolInitialization(){
-        int[][] s=new int[Parameters.S][(int)Math.pow(2,Parameters.M)];
-        for( int i=0; i<Parameters.S; ++i ) {
+        int[][] s=new int[Parameters.S][(int)Math.pow(2, Parameters.M)];
+        for(int i = 0; i< Parameters.S; ++i ) {
             for (int j=0; j<s[i].length; ++j) {
                 s[i][j] = (Math.random() < 0.5)? 1 : 0;
             }
@@ -100,7 +121,7 @@ public class Player extends Agent {
 
     private int takeDecision(int strategyChosen){
         int v=0, p;
-        for( int i=Parameters.M-1; i>=0; --i ){ //for all bits of m, from M-1 (least significant bit) to 0 (most significant bit)
+        for(int i = Parameters.M-1; i>=0; --i ){ //for all bits of m, from M-1 (least significant bit) to 0 (most significant bit)
             p=(int)Math.pow(2,(Parameters.M-1)-i);
             v=v+p*memory[i];
         }
@@ -119,9 +140,8 @@ public class Player extends Agent {
         return s;
     }
 
-    //0 == B, 1 == A
     private void update(int decision, int outcome, int strategyChosen){
-        for (int i=Parameters.M-1; i>0; i--) { //right-shift
+        for (int i = Parameters.M-1; i>0; i--) { //right-shift
             memory[i] = memory[i-1];
         }
         memory[0] = outcome;
