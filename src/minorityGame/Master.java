@@ -15,10 +15,10 @@ public class Master extends Agent {
         Observer observer = new Observer();
         try {
             cc = getContainerController();
-            ac = cc.createNewAgent("manager","provaMinority.Manager",new Object[]{observer});
+            ac = cc.createNewAgent("manager","minorityGame.Manager",new Object[]{observer});
             ac.start();
             for (int i = 0; i< Parameters.N; i++){
-                ac = cc.createNewAgent("player"+i,"provaMinority.Player",new Object[]{i,observer});
+                ac = cc.createNewAgent("player"+i,"minorityGame.Player",new Object[]{i,observer});
                 ac.start();
             }
         } catch (Exception e) {
