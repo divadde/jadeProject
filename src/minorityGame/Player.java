@@ -7,6 +7,7 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 
 
+
 public class Player extends Agent {
     private int[] memory;
     private int[][] strategyPool;
@@ -31,14 +32,15 @@ public class Player extends Agent {
         ready.addReceiver(new AID("manager",AID.ISLOCALNAME));
         ready.setConversationId("ready");
         send(ready);
-        addBehaviour(new TakeDecision());
+        addBehaviour(new PlayerBehaviour());
     }
 
-    private class TakeDecision extends Behaviour{
+    private class PlayerBehaviour extends Behaviour{
         private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
                 MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
-        private boolean doneAction=false;
 
+        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
         @Override
         public void action() {
             ACLMessage req = myAgent.receive(reqTempl);
@@ -49,54 +51,25 @@ public class Player extends Agent {
                 myStrategy = selectBestStrategy();
                 myDecision = takeDecision(myStrategy);
                 observer.playerChoice(lastStrategy, myStrategy);
-                //System.out.println("player "+myId+" take decision: "+ choice +", at step "+stepSim);
                 lastStrategy = myStrategy;
                 decision.setContent(String.valueOf(myDecision));
                 myAgent.send(decision);
-                doneAction=true;
+                ACLMessage outcome = myAgent.receive(outcomeTempl);
+                if (outcome!=null) {
+                    update(myDecision, Integer.parseInt(outcome.getContent()), myStrategy);
+                    stepSim++;
+                }
             }
             else {
                 block();
             }
         }
-
         @Override
         public boolean done() {
-            if (doneAction) {
-                myAgent.addBehaviour(new ReadResults());
-            }
-            return doneAction;
-        }
-
-    }
-
-    private class ReadResults extends Behaviour{
-
-        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
-                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
-        private boolean doneAction=false;
-
-        @Override
-        public void action() {
-            ACLMessage outcome = myAgent.receive(outcomeTempl);
-            if (outcome!=null) {
-                update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
-                stepSim++;
-                doneAction=true;
-            }
-            else { block(); }
-        }
-
-
-        @Override
-        public boolean done() {
-            if (doneAction) {
-                myAgent.addBehaviour(new TakeDecision());
-            }
-            if (stepSim>=Parameters.T && doneAction) {
+            if (stepSim==Parameters.T) {
                 myAgent.doDelete();
             }
-            return doneAction;
+            return stepSim == Parameters.T;
         }
     }
 
@@ -153,5 +126,72 @@ public class Player extends Agent {
             virtualScore[strategyChosen]--;
         }
     }
+
+
+    //Versione alternativa con i Behaviour
+    /*
+    private class TakeDecision extends Behaviour {
+        private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+        private boolean doneAction=false;
+
+        @Override
+        public void action() {
+            ACLMessage req = myAgent.receive(reqTempl);
+            if (req!=null) {
+                ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
+                decision.addReceiver(new AID("manager", AID.ISLOCALNAME));
+                decision.setConversationId("decision"); //Id della conversazione
+                myStrategy = selectBestStrategy();
+                myDecision = takeDecision(myStrategy);
+                observer.playerChoice(lastStrategy, myStrategy);
+                lastStrategy = myStrategy;
+                decision.setContent(String.valueOf(myDecision));
+                myAgent.send(decision);
+                doneAction=true;
+            }
+            else {
+                block();
+            }
+        }
+
+        @Override
+        public boolean done() {
+            if (doneAction) {
+                myAgent.addBehaviour(new ReadResults());
+            }
+            return doneAction;
+        }
+
+    }
+
+    private class ReadResults extends Behaviour{
+        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+        private boolean doneAction=false;
+
+        @Override
+        public void action() {
+            ACLMessage outcome = myAgent.receive(outcomeTempl);
+            if (outcome!=null) {
+                update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                stepSim++;
+                doneAction=true;
+            }
+            else { block(); }
+        }
+
+        @Override
+        public boolean done() {
+            if (doneAction) {
+                myAgent.addBehaviour(new TakeDecision());
+            }
+            if (stepSim>=Parameters.T && doneAction) {
+                myAgent.doDelete();
+            }
+            return doneAction;
+        }
+    }
+     */
 
 }

@@ -2,7 +2,7 @@ package minorityGamePt2;
 
 import jade.core.AID;
 import jade.core.Agent;
-import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.Behaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 
@@ -17,6 +17,10 @@ public class Player extends Agent {
     private int myId;
     private int stepSim=0;
     private Observer observer;
+
+    private int myDecision;
+    private int myStrategy;
+    private int lastStrategy;
 
 
     protected void setup(){
@@ -33,54 +37,47 @@ public class Player extends Agent {
     }
 
 
-    private class PlayerBehaviour extends CyclicBehaviour{
-        private int myDecision;
-        private int myStrategy;
-        private int lastStrategy;
+    private class PlayerBehaviour extends Behaviour{
         private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
                 MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+
         private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
                 MessageTemplate.MatchPerformative(ACLMessage.INFORM));
-
         @Override
         public void action() {
             ACLMessage req = myAgent.receive(reqTempl);
             if (req!=null) {
                 ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
-                decision.addReceiver(new AID("manager",AID.ISLOCALNAME));
+                decision.addReceiver(new AID("manager", AID.ISLOCALNAME));
                 decision.setConversationId("decision"); //Id della conversazione
                 myStrategy = selectBestStrategy(-1);
                 myDecision = takeDecision(myStrategy);
                 observer.playerChoice(lastStrategy, myStrategy);
-                //System.out.println("player "+myId+" take decision: "+ choice +", at step "+stepSim);
                 lastStrategy = myStrategy;
                 decision.setContent(String.valueOf(myDecision));
                 myAgent.send(decision);
                 ACLMessage outcome = myAgent.receive(outcomeTempl);
-                //System.out.println("Provo a ricevere outcome, player "+myId);
                 if (outcome!=null) {
-                    update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                    update(myDecision, Integer.parseInt(outcome.getContent()), myStrategy);
                     stepSim++;
-                    if (stepSim>=Parameters.T) {
-                        doDelete();
-                    }
                     if ((stepSim%Parameters.tau)==0) { //se è tempo di adattamento
-                        if ( ( ((double)realScore)/((double)stepSim) ) < Parameters.nFraction){ //se sono nella frazione perdente
+                        if ((((double) realScore) / ((double) stepSim)) < Parameters.nFraction) { //se sono nella frazione perdente
                             updateStrategy(Parameters.schema);
                         }
                     }
-                    //System.out.println("player "+myId+" memory after update: "+ Arrays.toString(memory) +", step "+stepSim);
-                    //System.out.println("player "+myId+" strategies after update: "+ Arrays.toString(virtualScore) +", step "+stepSim);
-                    //System.out.println("player "+myId+" score: "+ realScore +", step "+stepSim);
-                    //System.out.println("Player "+myId+"ha ricevuto l'outcome "+updateValue); //debug
-                    //System.out.println("Player "+myId+" score: "+realScore); //debug
                 }
-                else { block(); }
             }
-            else { block(); }
+            else {
+                block();
+            }
         }
-
-
+        @Override
+        public boolean done() {
+            if (stepSim== Parameters.T) {
+                myAgent.doDelete();
+            }
+            return stepSim == Parameters.T;
+        }
     }
 
 
@@ -111,10 +108,9 @@ public class Player extends Agent {
         return strategyPool[strategyChosen][v];
     }
 
-    //todo: da verificare
     private int selectBestStrategy(int strategyExcluded){
-        int s = 0;
-        int currMax = virtualScore[s];
+        int s = -1;
+        int currMax = Integer.MIN_VALUE;
         for (int i=0; i<virtualScore.length; i++){
             if (i!=strategyExcluded && currMax<virtualScore[i]) {
                 s=i;
@@ -124,7 +120,6 @@ public class Player extends Agent {
         return s;
     }
 
-    //0 == B, 1 == A
     private void update(int decision, int outcome, int strategyChosen){
         for (int i = Parameters.M-1; i>0; i--) { //right-shift
             memory[i] = memory[i-1];
@@ -139,7 +134,6 @@ public class Player extends Agent {
         }
     }
 
-    //todo: da verficiare
     private int[][] createChildren(int[] mother1, int[] mother2){
         int strategyDim = (int)Math.pow(2, Parameters.M);
         int[][] ret = new int[2][strategyDim];
@@ -157,9 +151,8 @@ public class Player extends Agent {
         return ret;
     }
 
-    //todo da verificare
     private void updateStrategy(String schema){
-        //Seleziono strategie madre
+        //seleziono le strategie madre
         int motherS1, motherS2;
         if (schema=="A" || schema=="B"){
             ArrayList<Integer> list = new ArrayList();
@@ -189,10 +182,10 @@ public class Player extends Agent {
         virtualScore[worstS2] = 0;
     }
 
-    //todo: da verificare
+
     private int selectWorstStrategy(int strategyExcluded){
-        int s = 0;
-        int currMin = virtualScore[s];
+        int s = -1;
+        int currMin = Integer.MAX_VALUE;
         for (int i=0; i<virtualScore.length; i++){
             if (i!=strategyExcluded && currMin>virtualScore[i]) {
                 s=i;
@@ -201,5 +194,77 @@ public class Player extends Agent {
         }
         return s;
     }
+
+    //Versione alternativa con i Behaviour
+    /*
+    private class TakeDecision extends Behaviour {
+        private MessageTemplate reqTempl= MessageTemplate.and(MessageTemplate.MatchConversationId("asking-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+        private boolean doneAction=false;
+
+        @Override
+        public void action() {
+            ACLMessage req = myAgent.receive(reqTempl);
+            if (req!=null) {
+                ACLMessage decision = new ACLMessage(ACLMessage.INFORM);
+                decision.addReceiver(new AID("manager", AID.ISLOCALNAME));
+                decision.setConversationId("decision"); //Id della conversazione
+                myStrategy = selectBestStrategy(-1);
+                myDecision = takeDecision(myStrategy);
+                observer.playerChoice(lastStrategy, myStrategy);
+                //System.out.println("player "+myId+" take decision: "+ choice +", at step "+stepSim);
+                lastStrategy = myStrategy;
+                decision.setContent(String.valueOf(myDecision));
+                myAgent.send(decision);
+                doneAction=true;
+            }
+            else {
+                block();
+            }
+        }
+
+        @Override
+        public boolean done() {
+            if (doneAction) {
+                myAgent.addBehaviour(new ReadResults());
+            }
+            return doneAction;
+        }
+
+    }
+
+    private class ReadResults extends Behaviour{
+        private MessageTemplate outcomeTempl = MessageTemplate.and(MessageTemplate.MatchConversationId("outcome-to-players"),
+                MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+        private boolean doneAction=false;
+
+        @Override
+        public void action() {
+            ACLMessage outcome = myAgent.receive(outcomeTempl);
+            if (outcome!=null) {
+                update(myDecision,Integer.parseInt(outcome.getContent()),myStrategy);
+                stepSim++;
+                if ((stepSim%Parameters.tau)==0) { //se è tempo di adattamento
+                    if ((((double) realScore) / ((double) stepSim)) < Parameters.nFraction) { //se sono nella frazione perdente
+                        updateStrategy(Parameters.schema);
+                    }
+                }
+                doneAction=true;
+            }
+            else { block(); }
+        }
+
+        @Override
+        public boolean done() {
+            if (doneAction) {
+                myAgent.addBehaviour(new TakeDecision());
+            }
+            if (stepSim>= Parameters.T && doneAction) {
+                myAgent.doDelete();
+            }
+            return doneAction;
+        }
+    }
+     */
 
 }

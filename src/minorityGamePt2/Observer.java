@@ -1,5 +1,7 @@
 package minorityGamePt2;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.LinkedList;
 
 public class Observer {
@@ -16,9 +18,29 @@ public class Observer {
         sideA.addLast(numerosity);
     }
     public void getSideA(){
+        /*
         System.out.println("---");
         for (Integer i: sideA) System.out.println(i);
         System.out.println("---");
+         */
+        try {
+            FileWriter myWriter = new FileWriter("sideA.txt");
+            double count=0;
+            double sum=0;
+            for (Integer i: sideA) {
+                if (count==10) {
+                    myWriter.write((sum/count)+"\n");
+                    sum=0;
+                    count=0;
+                }
+                sum+=i;
+                count++;
+            }
+            //for (Integer i: sideA) myWriter.write(i+"\n");
+            myWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
     public void calculateFsPerStep(int winningPlayers){
         fs = fs + ((double) winningPlayers)/((double) Parameters.N);
@@ -47,9 +69,29 @@ public class Observer {
         return 1;
     }
     public void getUtilty(){
+        /*
         System.out.println("---");
         for (Double i: utilityList) System.out.println(i);
         System.out.println("---");
+         */
+        try {
+            FileWriter myWriter = new FileWriter("utility.txt");
+            double count=0;
+            double sum=0;
+            for (Double i: utilityList) {
+                if (count==10) {
+                    myWriter.write((sum/count)+"\n");
+                    sum=0;
+                    count=0;
+                }
+                sum+=i;
+                count++;
+            }
+            //for (Double i: utilityList) myWriter.write(i+"\n");
+            myWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

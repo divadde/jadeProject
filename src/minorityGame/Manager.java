@@ -22,6 +22,7 @@ public class Manager extends Agent {
     }
 
     private class WaitPlayers extends Behaviour {
+        private int replies=0;
         MessageTemplate ready = MessageTemplate.and(MessageTemplate.MatchConversationId("ready"),
                 MessageTemplate.MatchPerformative(ACLMessage.INFORM));
         @Override
@@ -35,7 +36,7 @@ public class Manager extends Agent {
 
         @Override
         public boolean done() {
-            if (replies==Parameters.N) addBehaviour(new SendRequest());
+            if (replies==Parameters.N) myAgent.addBehaviour(new SendRequest());
             return replies==Parameters.N;
         }
     }
@@ -43,10 +44,11 @@ public class Manager extends Agent {
     private class SendRequest extends OneShotBehaviour {
         @Override
         public void action() {
-            numA=0; numB=0; replies=0;
             ACLMessage req = new ACLMessage(ACLMessage.REQUEST);
             req.setConversationId("asking-players"); //Id della conversazione
-            for (int i = 0; i < minorityGame.Parameters.N; i++) { req.addReceiver(new AID("player"+i,AID.ISLOCALNAME)); }
+            for (int i = 0; i < Parameters.N; i++) {
+                req.addReceiver(new AID("player" + i, AID.ISLOCALNAME));
+            }
             myAgent.send(req);
             myAgent.addBehaviour(new WaitReplies());
         }
@@ -58,6 +60,7 @@ public class Manager extends Agent {
 
         @Override
         public void action() {
+            //System.out.println("Attendo risposta");
             ACLMessage reply = myAgent.receive(decision);
             if (reply != null) {
                 int choice = Integer.parseInt(reply.getContent()); //0==B, 1==A
@@ -70,7 +73,7 @@ public class Manager extends Agent {
         }
 
         public boolean done() {
-            if (replies==Parameters.N) addBehaviour(new CalculateOutcome());
+            if (replies==Parameters.N) myAgent.addBehaviour(new CalculateOutcome());
             return replies==Parameters.N;
         }
     }
@@ -96,6 +99,7 @@ public class Manager extends Agent {
             myAgent.send(outcome);
             stepSim++;
             System.out.println("Numero simulazione: "+stepSim);
+            numA=0; numB=0; replies=0;
             if (stepSim>= Parameters.T) {
                 observer.getSideA();
                 System.out.println("End simulation: "+stepSim);
@@ -109,5 +113,6 @@ public class Manager extends Agent {
         }
 
     }
+
 
 }
